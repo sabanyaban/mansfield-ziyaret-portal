@@ -483,55 +483,81 @@ async function renderVisits() {
 }
 
 // Tablo aksiyonları
-visitTable.addEventListener('click', async e => {
-  const visitId = e.target.dataset?.id;
-  const index = e.target.dataset?.index;
-  if (!visitId) return;
+if (visitTable) {
+  visitTable.addEventListener('click', async e => {
+  // Buton içindeki element'e tıklanmışsa, butonu bul
+  const button = e.target.closest('button');
+  if (!button) return;
+  
+  const visitId = button.dataset?.id;
+  const index = button.dataset?.index;
+  
+  console.log('Tıklama yakalandı:', {
+    target: e.target.tagName,
+    button: button.className,
+    visitId: visitId
+  });
+  
+  if (!visitId) {
+    console.warn('visitId bulunamadı');
+    return;
+  }
   
   const list = await ensureVisitMeta();
   const visit = list.find(v => v.id === visitId);
-  if (!visit) return;
   
-  if (e.target.classList.contains('del')) {
+  if (!visit) {
+    console.warn('Ziyaret bulunamadı, ID:', visitId);
+    return;
+  }
+  
+  if (button.classList.contains('del')) {
+    console.log('Sil butonuna tıklandı, ziyaret:', visit);
     if (confirm(`"${visit.name}" ziyaretini silmek istediğinize emin misiniz?`)) {
       try {
-        console.log('Silinecek ziyaret ID:', visit.id);
+        console.log('Silme işlemi başlatılıyor, ID:', visit.id);
         const result = await deleteVisit(visit.id);
         console.log('Silme sonucu:', result);
         
         if (result) {
+          console.log('Liste yenileniyor...');
           await renderVisits();
           await renderCustomerLinks();
-          // Başarı mesajı (opsiyonel)
-          console.log('Ziyaret başarıyla silindi');
+          console.log('Ziyaret başarıyla silindi ve liste güncellendi');
         } else {
           alert('Ziyaret silinemedi. Lütfen tekrar deneyin.');
         }
       } catch (error) {
         console.error('Silme hatası:', error);
+        console.error('Hata stack:', error.stack);
         alert('Ziyaret silinirken bir hata oluştu: ' + (error.message || 'Bilinmeyen hata'));
       }
+    } else {
+      console.log('Silme işlemi iptal edildi');
     }
     return;
   }
-  if (e.target.classList.contains('rowToggle')) {
-    const row = e.target.closest('tr');
+  if (button.classList.contains('rowToggle')) {
+    const row = button.closest('tr');
     const next = row.nextElementSibling;
     if (next) next.style.display = (next.style.display === 'none') ? 'table-row' : 'none';
     return;
   }
-  if (e.target.classList.contains('edit')) {
+  if (button.classList.contains('edit')) {
     const listIndex = list.findIndex(v => v.id === visitId);
     if (listIndex !== -1) {
       openEditModal(listIndex);
     }
     return;
   }
-  if (e.target.classList.contains('pdf')) {
+  if (button.classList.contains('pdf')) {
     showVisitPDF(visit);
     return;
   }
-});
+  });
+} else {
+  console.error('visitTable elementi bulunamadı!');
+}
 
 // Filtre olayları
 ['q', 'fMode', 'fStatus', 'fPort', 'fMinVol', 'fFrom', 'fTo'].forEach(id => {
