@@ -297,6 +297,12 @@
   </div>
 
 <script>
+
+  // ====== Supabase bağlantısı ======
+  const SUPABASE_URL = 'https://grqklcgxwmboedacobld.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdycWtsY2d4d21ib2VkYWNvYmxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwMjc0NTUsImV4cCI6MjA3ODYwMzQ1NX0.8kUPsW6OtEZb-Dj0V83c0FcbhNyCnrbEZ3g6b_0dseo'; // anon public key
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
   // ====== Temel ayarlar ======
   const PASSWORD='12345';
   const STORAGE={
@@ -663,18 +669,41 @@
     });
   }
 
-  function saveVisit(v){
-    const list=ensureVisitMeta();
-    v.id = nextId(list);
-    v.ver = 1;
-    v.baseNote = v.notes || '';
-    v.updateNote = v.updateNote || '';
-    const newList=[v,...list];
-    save(STORAGE.visits,newList);
-    renderVisits();
-    renderCustomerLinks();
-    clearForm();
+async function saveVisit(v) {
+  const list = ensureVisitMeta();
+  v.id = nextId(list);
+  v.ver = 1;
+  v.baseNote = v.notes || '';
+  v.updateNote = v.updateNote || '';
+  const newList = [v, ...list];
+  save(STORAGE.visits, newList);
+  renderVisits();
+  renderCustomerLinks();
+  clearForm();
+
+  // --- Supabase'e de gönder ---
+  try {
+    const { error } = await supabase.from('visits').insert([{
+      name: v.name,
+      contact: v.contact,
+      phone: v.phone,
+      modes: v.modes,
+      status: v.status,
+      priority: v.priority,
+      ports: v.ports,
+      volume: v.volume,
+      vol_unit: v.volUnit,
+      visit_date: v.visitDate,
+      follow_date: v.followDate,
+      notes: v.notes
+    }]);
+    if (error) console.error("Supabase insert hatası:", error);
+    else console.log("Kayıt Supabase'e eklendi:", v.name);
+  } catch (err) {
+    console.error("Bağlantı hatası:", err);
   }
+}
+
 
   function renderVisits(){
     const list=ensureVisitMeta();
@@ -1024,7 +1053,46 @@
 
   // ilk çizimler
   $('#year').textContent=new Date().getFullYear();
+  
   renderLinks();
+  async function syncFromSupabase() {
+  try {
+    const { data, error } = await supabase
+      .from('visits')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    if (data && data.length) {
+      console.log("Supabase verileri yüklendi:", data.length);
+      save(STORAGE.visits, data.map(d => ({
+        id: d.id,
+        name: d.name,
+        contact: d.contact,
+        phone: d.phone,
+        modes: d.modes || [],
+        status: d.status,
+        priority: d.priority,
+        ports: d.ports || [],
+        volume: d.volume,
+        volUnit: d.vol_unit,
+        visitDate: d.visit_date,
+        followDate: d.follow_date,
+        notes: d.notes,
+        baseNote: d.notes,
+        updateNote: "",
+        ver: 1,
+      })));
+    }
+  } catch (err) {
+    console.error("Supabase sync hatası:", err);
+  }
+}
+
+// Sayfa yüklenirken çağır:
+await syncFromSupabase();
+renderVisits();
+renderCustomerLinks();
+
   renderVisits();
   renderCustomerLinks();
 </script>
@@ -1059,6 +1127,7 @@
 
 </body>
 </html>
+
 
 
 
