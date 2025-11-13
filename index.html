@@ -1026,5 +1026,35 @@
   renderVisits();
   renderCustomerLinks();
 </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = 'https://abcd1234.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOi...'; // anon public key
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  async function loadVisitsFromDB() {
+    const { data, error } = await supabase
+      .from('visits')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) console.error(error);
+    else console.log('DB verileri:', data);
+    return data;
+  }
+
+  async function saveVisitToDB(visit) {
+    const { data, error } = await supabase
+      .from('visits')
+      .insert([visit]);
+    if (error) console.error('Ekleme hatası:', error);
+    else console.log('Veri eklendi:', data);
+  }
+
+  // Örnek kullanım:
+  // loadVisitsFromDB();
+  // saveVisitToDB({ name: 'ABC Lojistik', status: 'Yeni', notes: 'İlk ziyaret' });
+</script>
+
 </body>
 </html>
+
