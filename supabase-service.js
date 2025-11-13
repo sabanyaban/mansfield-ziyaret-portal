@@ -194,8 +194,16 @@ async function updateVisit(id, updateData) {
  */
 async function deleteVisit(id) {
   try {
+    if (!id) {
+      console.error('deleteVisit: id parametresi eksik');
+      throw new Error('Ziyaret ID\'si bulunamadı');
+    }
+
+    console.log('deleteVisit çağrıldı, ID:', id);
+    
     const supabase = getSupabase();
     if (!supabase) {
+      console.warn('Supabase bağlantısı yok, localStorage\'dan siliniyor');
       // Fallback: localStorage
       const list = load(STORAGE.visits, []);
       const filtered = list.filter(v => v.id !== id);
@@ -203,16 +211,26 @@ async function deleteVisit(id) {
       return true;
     }
 
-    const { error } = await supabase
+    console.log('Supabase\'den siliniyor, ID:', id);
+    
+    const { data, error } = await supabase
       .from('visits')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select();
 
     if (error) {
       console.error('Ziyaret silinirken hata:', error);
+      console.error('Hata detayları:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
       throw error;
     }
 
+    console.log('Ziyaret başarıyla silindi:', data);
     return true;
   } catch (error) {
     console.error('deleteVisit hatası:', error);

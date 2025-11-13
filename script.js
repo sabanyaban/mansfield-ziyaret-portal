@@ -495,12 +495,21 @@ visitTable.addEventListener('click', async e => {
   if (e.target.classList.contains('del')) {
     if (confirm(`"${visit.name}" ziyaretini silmek istediğinize emin misiniz?`)) {
       try {
-        await deleteVisit(visit.id);
-        await renderVisits();
-        renderCustomerLinks();
+        console.log('Silinecek ziyaret ID:', visit.id);
+        const result = await deleteVisit(visit.id);
+        console.log('Silme sonucu:', result);
+        
+        if (result) {
+          await renderVisits();
+          await renderCustomerLinks();
+          // Başarı mesajı (opsiyonel)
+          console.log('Ziyaret başarıyla silindi');
+        } else {
+          alert('Ziyaret silinemedi. Lütfen tekrar deneyin.');
+        }
       } catch (error) {
         console.error('Silme hatası:', error);
-        alert('Ziyaret silinirken bir hata oluştu.');
+        alert('Ziyaret silinirken bir hata oluştu: ' + (error.message || 'Bilinmeyen hata'));
       }
     }
     return;
