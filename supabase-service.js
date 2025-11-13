@@ -26,6 +26,7 @@ function fromSupabaseFormat(data) {
     followDate: data.follow_date || null,
     notes: data.notes || '',
     createdAt: data.created_at || null,
+    isDeleted: data.is_deleted || false,
     // Eksik alanlar için varsayılanlar (eski kod uyumluluğu için)
     tags: [],
     needQuote: false,
@@ -83,7 +84,13 @@ async function getVisits() {
     const { data, error } = await supabase
       .from('visits')
       .select('*')
+      .eq('is_deleted', false) // Sadece silinmemiş kayıtları getir
       .order('created_at', { ascending: false });
+    
+    console.log('getVisits sonucu:', { 
+      dataLength: data?.length || 0, 
+      error: error?.message || null 
+    });
 
     if (error) {
       console.error('Ziyaretler getirilirken hata:', error);
@@ -211,13 +218,17 @@ async function deleteVisit(id) {
       return true;
     }
 
-    console.log('Supabase\'den siliniyor, ID:', id);
+    console.log('Supabase\'de soft delete yapılıyor, ID:', id);
+    console.log('ID tipi:', typeof id, 'ID değeri:', id);
     
-    const { data, error } = await supabase
+    // Silmek yerine is_deleted = true yap (soft delete)
+    // Select olmadan update yap (RLS sorunlarını önlemek için)
+    const { error } = await supabase
       .from('visits')
-      .delete()
-      .eq('id', id)
-      .select();
+      .update({ is_deleted: true })
+      .eq('id', id);
+
+    console.log('Update sonucu - error:', error);
 
     if (error) {
       console.error('Ziyaret silinirken hata:', error);
@@ -230,7 +241,18 @@ async function deleteVisit(id) {
       throw error;
     }
 
-    console.log('Ziyaret başarıyla silindi:', data);
+    // Update başarılı
+    console.log('Ziyaret başarıyla silindi (soft delete) - is_deleted = true yapıldı');
+    
+    // Güncellenmiş kaydı kontrol et (opsiyonel - debug için)
+    const { data: checkData } = await supabase
+      .from('visits')
+      .select('id, is_deleted')
+      .eq('id', id)
+      .single();
+    
+    console.log('Güncelleme kontrolü:', checkData);
+    
     return true;
   } catch (error) {
     console.error('deleteVisit hatası:', error);
