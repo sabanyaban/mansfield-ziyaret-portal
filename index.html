@@ -15,23 +15,6 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <!-- Basit giriş -->
-  <div id="gate" role="dialog" aria-modal="true" style="position:fixed;inset:0;display:grid;place-items:center;background:rgba(245,247,251,.9);z-index:50;">
-    <div style="width:min(92vw,480px);background:#fff;border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:0 6px 18px rgba(2,6,23,.08)">
-      <div class="row" style="justify-content:center;margin-bottom:8px">
-        <span class="logo-fallback"></span>
-        <div style="font-weight:900;font-size:18px;color:var(--accent2)">Mansfield Ziyaret Portalı</div>
-      </div>
-      <p class="muted" style="margin-top:0">Erişim için şifre girin. <strong>Not:</strong> Bu yalnızca görünürlük kalkanıdır.</p>
-      <label for="pw" class="muted">Şifre</label>
-      <input id="pw" type="password" placeholder="örn. 12345" autocomplete="current-password"/>
-      <div id="pwErr" style="display:none;color:#dc2626;font-size:12px;margin-top:6px">Şifre hatalı.</div>
-      <div class="row" style="justify-content:flex-end;margin-top:12px">
-        <button id="loginBtn" style="background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff;border-color:transparent">Giriş</button>
-      </div>
-    </div>
-  </div>
-
   <header>
     <div class="wrap row between">
       <div class="brand">

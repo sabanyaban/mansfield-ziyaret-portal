@@ -1,9 +1,7 @@
 // ====== Temel Ayarlar ======
-const PASSWORD = '12345';
 const STORAGE = {
   visits: 'intra.visits',
   links: 'intra.links',
-  session: 'intra.session',
   admin: 'intra.admin',
   logo: 'intra.logo',
   pol: 'intra.pol',
@@ -67,34 +65,6 @@ function nextId(list) {
 // Eski kod uyumluluğu için basit bir wrapper
 async function ensureVisitMeta() {
   return await getVisits();
-}
-
-// ====== Giriş Sistemi ======
-const gate = $('#gate');
-const loginBtn = $('#loginBtn');
-const pw = $('#pw');
-const pwErr = $('#pwErr');
-
-function allow() {
-  gate.style.display = 'none';
-  sessionStorage.setItem(STORAGE.session, 'ok');
-}
-
-loginBtn.addEventListener('click', () => {
-  if (pw.value === PASSWORD) {
-    allow();
-  } else {
-    pwErr.style.display = 'block';
-    pw.select();
-  }
-});
-
-pw.addEventListener('keypress', e => {
-  if (e.key === 'Enter') loginBtn.click();
-});
-
-if (sessionStorage.getItem(STORAGE.session) === 'ok') {
-  gate.style.display = 'none';
 }
 
 // ====== Saat ve Yazdır ======
