@@ -67,6 +67,252 @@ async function ensureVisitMeta() {
   return await getVisits();
 }
 
+// ====== Supabase Authentication Sistemi ======
+const gate = $('#gate');
+const loginBtn = $('#loginBtn');
+const loginEmail = $('#loginEmail');
+const loginPassword = $('#loginPassword');
+const loginErr = $('#loginErr');
+const loginLoading = $('#loginLoading');
+
+// Kullanıcı oturumunu kontrol et
+async function checkAuth() {
+  try {
+    const supabase = getSupabase();
+    if (!supabase || typeof supabase.auth === 'undefined') {
+      console.warn('Supabase yüklenmedi, giriş ekranı gösteriliyor');
+      if (gate) {
+        gate.style.display = 'grid';
+      }
+      return false;
+    }
+
+    // Session'ı kontrol et
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error('Session kontrolü hatası:', error);
+      if (gate) {
+        gate.style.display = 'grid';
+      }
+      return false;
+    }
+
+    if (session && session.user) {
+      console.log('✅ Kullanıcı oturumu aktif:', session.user.email);
+      if (gate) {
+        gate.style.display = 'none';
+      }
+      return true;
+    } else {
+      console.log('❌ Kullanıcı oturumu yok');
+      if (gate) {
+        gate.style.display = 'grid';
+      }
+      return false;
+    }
+  } catch (error) {
+    console.error('Auth kontrolü hatası:', error);
+    if (gate) {
+      gate.style.display = 'grid';
+    }
+    return false;
+  }
+}
+
+// Giriş yap
+async function handleLogin() {
+  const email = loginEmail.value.trim();
+  const password = loginPassword.value.trim();
+
+  if (!email || !password) {
+    loginErr.textContent = 'Lütfen e-posta ve şifre girin.';
+    loginErr.style.display = 'block';
+    return;
+  }
+
+  loginErr.style.display = 'none';
+  loginLoading.style.display = 'block';
+  loginBtn.disabled = true;
+
+  try {
+    const supabase = getSupabase();
+    if (!supabase) {
+      throw new Error('Supabase bağlantısı kurulamadı');
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password
+    });
+
+    if (error) {
+      console.error('Giriş hatası:', error);
+      loginErr.textContent = error.message || 'Giriş başarısız. E-posta ve şifrenizi kontrol edin.';
+      loginErr.style.display = 'block';
+      loginPassword.value = '';
+      loginPassword.focus();
+      return;
+    }
+
+    if (data.session && data.user) {
+      console.log('✅ Giriş başarılı:', data.user.email);
+      
+      // Kısa bir bekleme (session'ın kaydedilmesi için)
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Session'ı tekrar kontrol et
+      const { data: { session: verifiedSession } } = await supabase.auth.getSession();
+      
+      if (verifiedSession && verifiedSession.user) {
+        console.log('✅ Session doğrulandı:', verifiedSession.user.email);
+        if (gate) {
+          gate.style.display = 'none';
+        }
+        // Verileri hemen yükle (sayfa yenilemeden)
+        await renderVisits();
+        await renderCustomerLinks();
+        // Formu temizle
+        loginEmail.value = '';
+        loginPassword.value = '';
+      } else {
+        console.warn('⚠️ Session doğrulanamadı, tekrar kontrol ediliyor...');
+        // Biraz daha bekle ve tekrar dene
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const { data: { session: retrySession } } = await supabase.auth.getSession();
+        if (retrySession && retrySession.user) {
+          console.log('✅ Session ikinci denemede doğrulandı');
+          if (gate) {
+            gate.style.display = 'none';
+          }
+          await renderVisits();
+          await renderCustomerLinks();
+          loginEmail.value = '';
+          loginPassword.value = '';
+        } else {
+          console.error('❌ Session doğrulanamadı');
+          loginErr.textContent = 'Giriş yapıldı ancak oturum doğrulanamadı. Lütfen sayfayı yenileyin.';
+          loginErr.style.display = 'block';
+        }
+      }
+    } else {
+      console.error('❌ Giriş başarılı ama session veya user yok');
+      loginErr.textContent = 'Giriş yapıldı ancak oturum oluşturulamadı.';
+      loginErr.style.display = 'block';
+    }
+  } catch (error) {
+    console.error('Giriş işlemi hatası:', error);
+    loginErr.textContent = 'Bir hata oluştu: ' + (error.message || 'Bilinmeyen hata');
+    loginErr.style.display = 'block';
+  } finally {
+    loginLoading.style.display = 'none';
+    loginBtn.disabled = false;
+  }
+}
+
+// Çıkış yap
+async function handleLogout() {
+  try {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Çıkış hatası:', error);
+      } else {
+        console.log('✅ Çıkış yapıldı');
+        window.location.reload();
+      }
+    }
+  } catch (error) {
+    console.error('Çıkış işlemi hatası:', error);
+  }
+}
+
+// Event listener'lar
+if (loginBtn) {
+  loginBtn.addEventListener('click', handleLogin);
+}
+
+if (loginPassword) {
+  loginPassword.addEventListener('keypress', e => {
+    if (e.key === 'Enter') {
+      handleLogin();
+    }
+  });
+}
+
+if (loginEmail) {
+  loginEmail.addEventListener('keypress', e => {
+    if (e.key === 'Enter') {
+      loginPassword.focus();
+    }
+  });
+}
+
+// Auth state değişikliklerini dinle (Supabase başlatıldıktan sonra)
+function setupAuthListener() {
+  const supabase = getSupabase();
+  if (supabase && typeof supabase.auth !== 'undefined') {
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state değişti:', event, session?.user?.email);
+      
+      if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) {
+        console.log('❌ Kullanıcı çıkış yaptı veya session yok');
+        if (gate) {
+          gate.style.display = 'grid';
+        }
+      } else if (event === 'SIGNED_IN' && session && session.user) {
+        console.log('✅ Kullanıcı giriş yaptı:', session.user.email);
+        if (gate) {
+          gate.style.display = 'none';
+        }
+        // Verileri yeniden yükle
+        try {
+          await renderVisits();
+          await renderCustomerLinks();
+        } catch (error) {
+          console.error('Veri yükleme hatası:', error);
+        }
+      } else if (event === 'TOKEN_REFRESHED' && session && session.user) {
+        // Token yenilendi, session hala aktif
+        console.log('🔄 Token yenilendi:', session.user.email);
+        if (gate) {
+          gate.style.display = 'none';
+        }
+      } else if (event === 'INITIAL_SESSION' && session && session.user) {
+        // İlk session kontrolü
+        console.log('✅ İlk session bulundu:', session.user.email);
+        if (gate) {
+          gate.style.display = 'none';
+        }
+      }
+    });
+  }
+}
+
+// Sayfa yüklendiğinde auth kontrolü (Supabase başlatıldıktan sonra)
+async function initAuth() {
+  // Supabase'in yüklenmesini bekle (daha uzun süre)
+  let attempts = 0;
+  while (attempts < 20) {
+    const supabase = getSupabase();
+    if (supabase && typeof supabase.auth !== 'undefined') {
+      // Supabase hazır, auth kontrolünü yap
+      const authResult = await checkAuth();
+      setupAuthListener();
+      return authResult;
+    }
+    await new Promise(resolve => setTimeout(resolve, 300));
+    attempts++;
+  }
+  // Supabase yüklenemediyse giriş ekranını göster
+  console.warn('Supabase yüklenemedi, giriş ekranı gösteriliyor');
+  if (gate) {
+    gate.style.display = 'grid';
+  }
+  return false;
+}
+
 // ====== Saat ve Yazdır ======
 const clock = $('#clock');
 function tick() {
@@ -77,23 +323,20 @@ tick();
 
 $('#printBtn').addEventListener('click', () => window.print());
 
+// Çıkış butonu event listener'ı DOMContentLoaded içinde eklenecek
+
 // ====== Admin Modu, Logo ve POL/POD Yönetimi ======
 const adminToggle = $('#adminToggle');
 
-function setBrandLogo(src) {
+// Logo artık sabit olarak Mansfield.png kullanılıyor
+function setBrandLogo() {
   const img = $('#brandLogo');
-  const fb = $('#brandFallback');
-  if (src) {
-    img.src = src;
+  if (img) {
+    img.src = 'Mansfield.png';
     img.style.display = 'inline-block';
-    fb.style.display = 'none';
-  } else {
-    img.removeAttribute('src');
-    img.style.display = 'none';
-    fb.style.display = 'inline-block';
   }
 }
-setBrandLogo(load(STORAGE.logo, '') || null);
+setBrandLogo();
 
 function renderPolPodAdmin() {
   const polArea = $('#polAdmin');
@@ -108,7 +351,6 @@ function setAdmin(on) {
   save(STORAGE.admin, !!on);
   $('#linkAdd').style.display = on ? 'inline-block' : 'none';
   $('#linkEdit').style.display = 'none';
-  $('#logoAdmin').style.display = on ? 'block' : 'none';
   if (on) {
     renderPolPodAdmin();
   }
@@ -116,20 +358,7 @@ function setAdmin(on) {
 adminToggle.addEventListener('change', e => setAdmin(e.target.checked));
 setAdmin(load(STORAGE.admin, false));
 
-const logoFileEl = $('#logoFile');
-if (logoFileEl) {
-  logoFileEl.addEventListener('change', e => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const rd = new FileReader();
-    rd.onload = () => {
-      save(STORAGE.logo, rd.result);
-      setBrandLogo(rd.result);
-      alert('Logo kaydedildi.');
-    };
-    rd.readAsDataURL(f);
-  });
-}
+// Logo değiştirme özelliği kaldırıldı - artık sabit olarak Mansfield.png kullanılıyor
 
 // POL/POD admin kayıt
 $('#polpodSave')?.addEventListener('click', () => {
@@ -759,7 +988,7 @@ function showVisitPDF(v) {
 
   let x = 140, y = 80, lh = 26, maxW = cw - 180;
 
-  const logo = load(STORAGE.logo, '');
+  // Logo artık sabit olarak Mansfield.png kullanılıyor
   const img = new Image();
   img.onload = () => {
     try {
@@ -772,7 +1001,7 @@ function showVisitPDF(v) {
     draw();
     push();
   };
-  img.src = logo || '';
+  img.src = 'Mansfield.png';
 
   function draw() {
     ctx.font = 'bold 34px Arial, Helvetica, sans-serif';
@@ -817,20 +1046,38 @@ function showVisitPDF(v) {
 
 // ====== İlk Çizimler ======
 // Sayfa tamamen yüklendiğinde başlat
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   // Bağlantı durumunu başlat
   updateConnectionStatus('checking', 'Bağlantı kontrol ediliyor...');
   
   // Supabase'i başlat
   initSupabase();
   
-  // Verileri çek
-  (async () => {
-    $('#year').textContent = new Date().getFullYear();
-    renderLinks();
-    await renderVisits();
-    await renderCustomerLinks();
-  })();
+  // Auth kontrolünü yap (Supabase başlatıldıktan sonra)
+  await initAuth();
+  
+  // Çıkış butonu event listener'ını ekle
+  const logoutBtn = $('#logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      if (confirm('Çıkış yapmak istediğinize emin misiniz?')) {
+        handleLogout();
+      }
+    });
+  }
+  
+  // Eğer authenticated ise verileri çek
+  const supabase = getSupabase();
+  if (supabase) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      // Kullanıcı giriş yapmış, verileri yükle
+      $('#year').textContent = new Date().getFullYear();
+      renderLinks();
+      await renderVisits();
+      await renderCustomerLinks();
+    }
+  }
 });
 
 // Eğer DOMContentLoaded zaten geçtiyse hemen çalıştır
@@ -838,13 +1085,31 @@ if (document.readyState === 'loading') {
   // DOMContentLoaded bekleniyor, yukarıdaki kod çalışacak
 } else {
   // DOM zaten yüklendi, hemen çalıştır
-  updateConnectionStatus('checking', 'Bağlantı kontrol ediliyor...');
-  initSupabase();
   (async () => {
-    $('#year').textContent = new Date().getFullYear();
-    renderLinks();
-    await renderVisits();
-    await renderCustomerLinks();
+    updateConnectionStatus('checking', 'Bağlantı kontrol ediliyor...');
+    initSupabase();
+    await initAuth();
+    
+    // Çıkış butonu event listener'ını ekle
+    const logoutBtn = $('#logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => {
+        if (confirm('Çıkış yapmak istediğinize emin misiniz?')) {
+          handleLogout();
+        }
+      });
+    }
+    
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        $('#year').textContent = new Date().getFullYear();
+        renderLinks();
+        await renderVisits();
+        await renderCustomerLinks();
+      }
+    }
   })();
 }
 

@@ -65,11 +65,10 @@ header {
 }
 
 #brandLogo {
-  width: 32px;
-  height: 32px;
+  height: 40px;
+  width: auto;
   object-fit: contain;
-  border-radius: 6px;
-  display: none;
+  display: inline-block;
 }
 
 .logo-fallback {
@@ -99,6 +98,21 @@ button:hover {
 
 button:active {
   transform: translateY(0);
+}
+
+/* Çıkış butonu */
+#logoutBtn {
+  background: #dc2626 !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+#logoutBtn:hover {
+  background: #b91c1c !important;
+}
+
+#logoutBtn:active {
+  background: #991b1b !important;
 }
 
 /* ====== Grid ve Kartlar ====== */
